@@ -269,7 +269,7 @@
 </head>
 <body>
   <header style="text-align:center">
-    <h1>0805 LED Grid - PCB Animation Preview</h1>
+    <h1>0805 SMD LED Grid - PCB Animation Preview</h1>
     <p class="subtitle" id="subtitle">7x7 Led matrix, Click to toggle</p>
   </header>
 
@@ -356,7 +356,7 @@
     function updateMatrixLabel() {
       const total = gridSize * gridSize;
       totalCountEl.textContent = total;
-      subtitleEl.textContent = `${gridSize}x${gridSize}  7x7 led matrix Click to toggle`;
+      subtitleEl.textContent = `${gridSize}x${gridSize}  led matrix, Click to toggle`;
     }
 
     function buildGrid() {
