@@ -1,4 +1,4 @@
-# 7x7 LED Matrix — ESP32-C6 + HT16K33
+# 7x7 LED Matrix
  
 A compact 7x7 red SMD LED matrix controller built around the HT16K33 LED driver and ESP32-C6 SuperMini. Designed as a custom PCB with a single push button for interaction.
 
