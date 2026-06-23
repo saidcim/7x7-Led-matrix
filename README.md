@@ -32,3 +32,12 @@ SCL       →  SCL
 3.3V      →  VDD
 GND       →  GND
 ```
+I2C pull-up resistors (10kΩ) are on the PCB.
+ 
+## Getting Started
+ 
+1. Clone the repo
+2. Open the project in Arduino IDE
+3. Install dependencies: Wire Library
+4. Flash to ESP32-C6
+5. Press the button to interact
