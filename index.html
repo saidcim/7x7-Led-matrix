@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>0805 LED Grid - PCB Animation Preview</title>
+  <style>
+    :root {
+      --pcb-bg: #0b1a2e;
+      --pcb-trace: rgba(80, 140, 200, 0.22);
+      --led-off: #3a1520;
+      --led-on: #e82020;
+      --pad: #c9a84c;
+      --cathode: #2ecc40;
+      --panel-bg: #111c2b;
+      --accent: #4a9eff;
+      --text: #c8d6e5;
+      --text-dim: #7a8fa8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: #060d18;
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      gap: 20px;
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--text);
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .layout {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      justify-content: center;
+      align-items: flex-start;
+      width: 100%;
+      max-width: 1100px;
+    }
+
+    .pcb-wrapper {
+      position: relative;
+      padding: 28px;
+      background: linear-gradient(145deg, #0d1f38 0%, var(--pcb-bg) 50%, #081525 100%);
+      border-radius: 12px;
+      box-shadow:
+        0 0 0 1px rgba(74, 158, 255, 0.12),
+        0 12px 40px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    .pcb-board {
+      position: relative;
+      background: var(--pcb-bg);
+      border-radius: 4px;
+      overflow: visible;
+    }
+
+    .traces-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .grid-container {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      width: var(--grid-size, 480px);
+      height: var(--grid-size, 480px);
+    }
+
+    .led-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .led-0805 {
+      position: relative;
+      width: var(--led-w, 28px);
+      height: var(--led-h, 14px);
+      transform: rotate(45deg);
+      transition: filter 0.08s ease;
+    }
+
+    .led-cell:hover .led-0805 {
+      filter: brightness(1.25);
+    }
+
+    .led-body {
+      position: absolute;
+      inset: 0;
+      background: var(--led-off);
+      border-radius: 1px;
+      box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.5);
+      transition: background 0.06s ease, box-shadow 0.06s ease;
+    }
+
+    .led-cell.on .led-body {
+      background: var(--led-on);
+      box-shadow:
+        0 0 6px rgba(232, 32, 32, 0.7),
+        0 0 14px rgba(232, 32, 32, 0.35),
+        inset 0 0 2px rgba(255, 120, 120, 0.4);
+    }
+
+    .pad {
+      position: absolute;
+      width: 22%;
+      height: 100%;
+      background: var(--pad);
+      border-radius: 1px;
+      top: 0;
+    }
+
+    .pad-left { left: -18%; }
+    .pad-right { right: -18%; }
+
+    .cathode-mark {
+      position: absolute;
+      width: 18%;
+      height: 35%;
+      background: var(--cathode);
+      top: 8%;
+      right: 12%;
+      border-radius: 1px;
+      opacity: 0.85;
+    }
+
+    .panel {
+      background: var(--panel-bg);
+      border-radius: 12px;
+      padding: 20px 22px;
+      width: 300px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(74, 158, 255, 0.1);
+    }
+
+    .panel h2 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin-bottom: 14px;
+    }
+
+    .control-group {
+      margin-bottom: 18px;
+    }
+
+    .control-group label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
+    .control-group label span {
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"], select {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    select {
+      background: rgba(74, 158, 255, 0.08);
+      border: 1px solid rgba(74, 158, 255, 0.25);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+    }
+
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      max-height: 280px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .btn-grid::-webkit-scrollbar { width: 5px; }
+    .btn-grid::-webkit-scrollbar-thumb {
+      background: rgba(74, 158, 255, 0.3);
+      border-radius: 3px;
+    }
+
+    button {
+      background: rgba(74, 158, 255, 0.12);
+      border: 1px solid rgba(74, 158, 255, 0.25);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    button:hover {
+      background: rgba(74, 158, 255, 0.22);
+      border-color: rgba(74, 158, 255, 0.45);
+    }
+
+    button.active {
+      background: rgba(74, 158, 255, 0.35);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    button.danger {
+      border-color: rgba(232, 80, 80, 0.35);
+      background: rgba(232, 80, 80, 0.1);
+    }
+
+    button.danger:hover {
+      background: rgba(232, 80, 80, 0.2);
+    }
+
+    .hint {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      line-height: 1.5;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .status-bar {
+      display: flex;
+      gap: 16px;
+      font-size: 0.78rem;
+      color: var(--text-dim);
+    }
+
+    .status-bar strong {
+      color: var(--accent);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <header style="text-align:center">
+    <h1>0805 LED Grid - PCB Animation Preview</h1>
+    <p class="subtitle" id="subtitle">7x7 matrix · 45° placement · Click = toggle</p>
+  </header>
+
+  <div class="layout">
+    <div class="pcb-wrapper">
+      <div class="pcb-board" id="pcbBoard">
+        <svg class="traces-svg" id="tracesSvg"></svg>
+        <div class="grid-container" id="grid"></div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <h2>Animations</h2>
+      <div class="control-group">
+        <label>Animation speed <span id="speedVal">80 ms</span></label>
+        <input type="range" id="speedSlider" min="20" max="300" value="80" step="10">
+      </div>
+      <div class="btn-grid" id="animButtons">
+        <button data-anim="wave-h">Wave →</button>
+        <button data-anim="wave-v">Wave ↓</button>
+        <button data-anim="snake">Snake</button>
+        <button data-anim="spiral">Spiral</button>
+        <button data-anim="propeller">Propeller</button>
+        <button data-anim="rain">Rain</button>
+        <button data-anim="checker">Checker</button>
+        <button data-anim="pulse">Pulse</button>
+        <button data-anim="random">Random</button>
+        <button data-anim="corners">Corners</button>
+        <button data-anim="cross">Cross</button>
+        <button data-anim="fire">Fire</button>
+        <button data-anim="matrix-rain">Digital Rain</button>
+        <button data-anim="radar">Radar</button>
+        <button data-anim="border">Border</button>
+        <button data-anim="diamond">Diamond</button>
+        <button data-anim="equalizer">Equalizer</button>
+        <button data-anim="ripple">Ripple</button>
+        <button data-anim="life">Life</button>
+        <button data-anim="explosion">Explosion</button>
+        <button data-anim="plasma">Plasma</button>
+        <button data-anim="heartbeat">Heart</button>
+        <button data-anim="clock">Clock</button>
+        <button data-anim="sos">SOS</button>
+        <button data-anim="knight">Knight</button>
+        <button data-anim="diagonal">Diagonal</button>
+        <button data-anim="fill">Fill</button>
+        <button class="danger" id="stopBtn">Stop</button>
+        <button class="danger" id="clearBtn">Clear</button>
+      </div>
+
+      <p class="hint">
+        Click any LED to toggle it manually. Clicking while an animation is running stops the animation.
+        Matrix size, LED spacing, and grid size are fixed in the code so you can tune them directly.
+      </p>
+    </aside>
+  </div>
+
+  <div class="status-bar">
+    <span>LEDs on: <strong id="onCount">0</strong> / <strong id="totalCount">49</strong></span>
+    <span>Status: <strong id="animStatus">Ready</strong></span>
+  </div>
+
+  <script>
+    const MATRIX_SIZE = 7;
+    const LED_GAP_PX = 4;
+    const GRID_SIZE_PX = 480;
+
+    let gridSize = MATRIX_SIZE;
+    const gridEl = document.getElementById('grid');
+    const tracesSvg = document.getElementById('tracesSvg');
+    const speedSlider = document.getElementById('speedSlider');
+    const speedVal = document.getElementById('speedVal');
+    const onCountEl = document.getElementById('onCount');
+    const totalCountEl = document.getElementById('totalCount');
+    const subtitleEl = document.getElementById('subtitle');
+    const animStatus = document.getElementById('animStatus');
+
+    let cells = [];
+    let animTimer = null;
+    let animFrame = null;
+    let currentAnim = null;
+
+    function idx(r, c) { return r * gridSize + c; }
+
+    function updateMatrixLabel() {
+      const total = gridSize * gridSize;
+      totalCountEl.textContent = total;
+      subtitleEl.textContent = `${gridSize}x${gridSize} matrix · 45° placement · Click = toggle`;
+    }
+
+    function buildGrid() {
+      stopAnimation();
+      gridSize = MATRIX_SIZE;
+      updateMatrixLabel();
+      gridEl.innerHTML = '';
+      cells = [];
+      gridEl.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+      gridEl.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`;
+      for (let r = 0; r < gridSize; r++) {
+        for (let c = 0; c < gridSize; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'led-cell';
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          cell.innerHTML = `
+            <div class="led-0805">
+              <div class="pad pad-left"></div>
+              <div class="pad pad-right"></div>
+              <div class="led-body"></div>
+              <div class="cathode-mark"></div>
+            </div>`;
+          cell.addEventListener('click', () => {
+            stopAnimation();
+            cell.classList.toggle('on');
+            updateCount();
+          });
+          gridEl.appendChild(cell);
+          cells.push(cell);
+        }
+      }
+      applyLayout();
+    }
+
+    function parseGap() {
+      const raw = LED_GAP_PX;
+      if (raw < 0) return { gap: 0, squeeze: -raw };
+      return { gap: raw, squeeze: 0 };
+    }
+
+    function applyLayout() {
+      const { gap, squeeze } = parseGap();
+      const size = GRID_SIZE_PX;
+
+      gridEl.style.setProperty('--grid-size', size + 'px');
+      gridEl.style.gap = gap + 'px';
+      gridEl.style.setProperty('--cell-squeeze', squeeze + 'px');
+
+      const cellSize = (size - gap * (gridSize - 1)) / gridSize;
+      const squeezeBoost = squeeze * 0.04;
+      const ledW = Math.max(8, cellSize * (0.55 + squeezeBoost));
+      const ledH = ledW * 0.5;
+      gridEl.style.setProperty('--led-w', ledW + 'px');
+      gridEl.style.setProperty('--led-h', ledH + 'px');
+
+      cells.forEach(cell => {
+        cell.style.margin = squeeze > 0 ? `-${squeeze}px` : '';
+      });
+
+      drawTraces(size, gap, squeeze);
+    }
+
+    function drawTraces(size, gap, squeeze) {
+      const pitch = (size - gap * (gridSize - 1)) / gridSize;
+      tracesSvg.setAttribute('width', size);
+      tracesSvg.setAttribute('height', size);
+      tracesSvg.innerHTML = '';
+
+      const mkLine = (x1, y1, x2, y2) => {
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+        line.setAttribute('stroke', 'rgba(80,140,200,0.22)');
+        line.setAttribute('stroke-width', '1');
+        tracesSvg.appendChild(line);
+      };
+
+      const step = pitch + gap;
+      for (let r = 0; r < gridSize; r++) {
+        for (let c = 0; c < gridSize; c++) {
+          const cx = c * step + pitch / 2;
+          const cy = r * step + pitch / 2;
+          if (c < gridSize - 1) mkLine(cx, cy, cx + step, cy);
+          if (r < gridSize - 1) mkLine(cx, cy, cx, cy + step);
+        }
+      }
+    }
+
+    function setAll(on) {
+      cells.forEach(c => c.classList.toggle('on', on));
+      updateCount();
+    }
+
+    function setCell(r, c, on) {
+      cells[idx(r, c)].classList.toggle('on', on);
+    }
+
+    function setCellSafe(r, c, on) {
+      if (r < 0 || r >= gridSize || c < 0 || c >= gridSize) return;
+      setCell(r, c, on);
+    }
+
+    const animLabels = {
+      'wave-h': 'Wave →', 'wave-v': 'Wave ↓', snake: 'Snake', spiral: 'Spiral',
+      propeller: 'Propeller', rain: 'Rain', checker: 'Checker', pulse: 'Pulse',
+      random: 'Random', corners: 'Corners', cross: 'Cross', fire: 'Fire',
+      'matrix-rain': 'Digital Rain', radar: 'Radar', border: 'Border',
+      diamond: 'Diamond', equalizer: 'Equalizer', ripple: 'Ripple', life: 'Life',
+      explosion: 'Explosion', plasma: 'Plasma', heartbeat: 'Heart', clock: 'Clock',
+      sos: 'SOS', knight: 'Knight', diagonal: 'Diagonal', fill: 'Fill'
+    };
+
+    function drawHand(center, angle, len) {
+      for (let d = 0; d <= len; d++) {
+        setCellSafe(Math.round(center + d * Math.sin(angle)), Math.round(center + d * Math.cos(angle)), true);
+      }
+    }
+
+    function drawHeart(scale, offsetR, offsetC) {
+      for (let r = 0; r < gridSize; r++) {
+        for (let c = 0; c < gridSize; c++) {
+          const x = (c - offsetC) / scale;
+          const y = -(r - offsetR) / scale;
+          const v = Math.pow(x * x + y * y - 1, 3) - x * x * Math.pow(y, 3);
+          if (v <= 0.05) setCellSafe(r, c, true);
+        }
+      }
+    }
+
+    function getBorderPath() {
+      const path = [];
+      const last = gridSize - 1;
+      for (let c = 0; c < gridSize; c++) path.push([0, c]);
+      for (let r = 1; r < gridSize; r++) path.push([r, last]);
+      for (let c = last - 1; c >= 0; c--) path.push([last, c]);
+      for (let r = last - 1; r > 0; r--) path.push([r, 0]);
+      return path;
+    }
+
+    function drawPropeller(angle) {
+      setAll(false);
+      const center = (gridSize - 1) / 2;
+      const hubR = Math.round(center);
+      const hubC = Math.round(center);
+      setCellSafe(hubR, hubC, true);
+
+      const blades = 3;
+      const maxDist = gridSize * 0.52;
+      const steps = Math.ceil(maxDist * 4);
+
+      for (let b = 0; b < blades; b++) {
+        const bladeAngle = angle + (b * 2 * Math.PI / blades);
+        const perp = bladeAngle + Math.PI / 2;
+        for (let i = 1; i <= steps; i++) {
+          const dist = (i / steps) * maxDist;
+          for (const w of [-0.55, 0, 0.55]) {
+            const c = center + dist * Math.cos(bladeAngle) + w * Math.cos(perp);
+            const r = center + dist * Math.sin(bladeAngle) + w * Math.sin(perp);
+            setCellSafe(Math.round(r), Math.round(c), true);
+          }
+        }
+      }
+      updateCount();
+    }
+
+    function updateCount() {
+      onCountEl.textContent = cells.filter(c => c.classList.contains('on')).length;
+    }
+
+    function stopAnimation() {
+      if (animTimer) { clearInterval(animTimer); animTimer = null; }
+      if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+      currentAnim = null;
+      document.querySelectorAll('#animButtons button[data-anim]').forEach(b => b.classList.remove('active'));
+      animStatus.textContent = 'Ready';
+    }
+
+    function getSpeed() { return +speedSlider.value; }
+
+    function startAnim(name, fn) {
+      stopAnimation();
+      currentAnim = name;
+      document.querySelector(`[data-anim="${name}"]`)?.classList.add('active');
+      animStatus.textContent = animLabels[name] || name;
+      fn();
+    }
+
+    const animations = {
+      'wave-h': () => {
+        let col = 0;
+        animTimer = setInterval(() => {
+          setAll(false);
+          for (let r = 0; r < gridSize; r++) setCell(r, col, true);
+          col = (col + 1) % gridSize;
+        }, getSpeed());
+      },
+
+      'wave-v': () => {
+        let row = 0;
+        animTimer = setInterval(() => {
+          setAll(false);
+          for (let c = 0; c < gridSize; c++) setCell(row, c, true);
+          row = (row + 1) % gridSize;
+        }, getSpeed());
+      },
+
+      'snake': () => {
+        const path = [];
+        for (let r = 0; r < gridSize; r++) {
+          if (r % 2 === 0) for (let c = 0; c < gridSize; c++) path.push([r, c]);
+          else for (let c = gridSize - 1; c >= 0; c--) path.push([r, c]);
+        }
+        let i = 0;
+        const trail = 6;
+        animTimer = setInterval(() => {
+          setAll(false);
+          for (let t = 0; t < trail; t++) {
+            const p = path[(i - t + path.length) % path.length];
+            setCell(p[0], p[1], true);
+          }
+          i = (i + 1) % path.length;
+          updateCount();
+        }, getSpeed());
+      },
+
+      'spiral': () => {
+        const spiral = [];
+        let top = 0, bottom = gridSize - 1, left = 0, right = gridSize - 1;
+        while (top <= bottom && left <= right) {
+          for (let c = left; c <= right; c++) spiral.push([top, c]);
+          top++;
+          for (let r = top; r <= bottom; r++) spiral.push([r, right]);
+          right--;
+          if (top <= bottom) { for (let c = right; c >= left; c--) spiral.push([bottom, c]); bottom--; }
+          if (left <= right) { for (let r = bottom; r >= top; r--) spiral.push([r, left]); left++; }
+        }
+        let i = 0;
+        animTimer = setInterval(() => {
+          setAll(false);
+          for (let t = 0; t <= i; t++) {
+            const p = spiral[t];
+            setCell(p[0], p[1], true);
+          }
+          i = (i + 1) % spiral.length;
+          updateCount();
+        }, getSpeed());
+      },
+
+      'propeller': () => {
+        let angle = 0;
+        const spin = Math.PI / 10;
+        animTimer = setInterval(() => {
+          drawPropeller(angle);
+          angle = (angle + spin) % (Math.PI * 2);
+        }, getSpeed() * 0.55);
+      },
+
+      'rain': () => {
+        animTimer = setInterval(() => {
+          for (let c = 0; c < gridSize; c++) {
+            for (let r = gridSize - 1; r > 0; r--) {
+              setCell(r, c, cells[idx(r - 1, c)].classList.contains('on'));
+            }
+            setCell(0, c, Math.random() < 0.35);
+          }
+          updateCount();
+        }, getSpeed() * 1.5);
+      },
+
+      'checker': () => {
+        let phase = 0;
+        animTimer = setInterval(() => {
+          setAll(false);
+          for (let r = 0; r < gridSize; r++)
+            for (let c = 0; c < gridSize; c++)
+              if ((r + c + phase) % 2 === 0) setCell(r, c, true);
+          phase = 1 - phase;
+          updateCount();
+        }, getSpeed() * 3);
+      },
+
+      'pulse': () => {
+        const center = (gridSize - 1) / 2;
+        let radius = 0;
+        animTimer = setInterval(() => {
+          setAll(false);
+          for (let r = 0; r < gridSize; r++)
+            for (let c = 0; c < gridSize; c++) {
+              const dist = Math.hypot(r - center, c - center);
+              if (Math.abs(dist - radius) < 0.6) setCell(r, c, true);
+            }
+          radius = (radius + 0.5) % (gridSize * 0.75 + 1);
+          updateCount();
+        }, getSpeed());
+      },
+
+      'random': () => {
+        animTimer = setInterval(() => {
+          const r = Math.floor(Math.random() * gridSize);
+          const c = Math.floor(Math.random() * gridSize);
+          cells[idx(r, c)].classList.toggle('on');
+          updateCount();
+        }, getSpeed());
+      },
+
+      'corners': () => {
+        const last = gridSize - 1;
+        const corners = [[0, 0], [0, last], [last, 0], [last, last]];
+        let i = 0;
+        animTimer = setInterval(() => {
+          setAll(false);
+          corners.forEach(([r, c]) => setCell(r, c, true));
+          const [r, c] = corners[i];
+          for (let dr = -1; dr <= 1; dr++)
+            for (let dc = -1; dc <= 1; dc++) {
+              const nr = r + dr, nc = c + dc;
+              if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) setCell(nr, nc, true);
+            }
+          i = (i + 1) % corners.length;
+          updateCount();
+        }, getSpeed() * 4);
+      },
+
+      'cross': () => {
+        let flip = false;
+        animTimer = setInterval(() => {
+          setAll(false);
+          const mid = Math.floor(gridSize / 2);
+          if (!flip) {
+            for (let c = 0; c < gridSize; c++) setCell(mid, c, true);
+          } else {
+            for (let r = 0; r < gridSize; r++) setCell(r, mid, true);
+          }
+          flip = !flip;
+          updateCount();
+        }, getSpeed() * 3);
+      },
+
+      'fire': () => {
+        setAll(false);
+        for (let c = 0; c < gridSize; c++) setCell(gridSize - 1, c, Math.random() > 0.25);
+        animTimer = setInterval(() => {
+          const next = Array.from({ length: gridSize }, () => Array(gridSize).fill(false));
+          for (let r = 0; r < gridSize; r++) {
+            for (let c = 0; c < gridSize; c++) {
+              if (r === gridSize - 1) {
+                next[r][c] = Math.random() > 0.35;
+                continue;
+              }
+              const b = cells[idx(r + 1, c)].classList.contains('on');
+              const bl = c > 0 && cells[idx(r + 1, c - 1)].classList.contains('on');
+              const br = c < gridSize - 1 && cells[idx(r + 1, c + 1)].classList.contains('on');
+              next[r][c] = (b || bl || br) && Math.random() > 0.22;
+            }
+          }
+          setAll(false);
+          for (let r = 0; r < gridSize; r++)
+            for (let c = 0; c < gridSize; c++)
+              if (next[r][c]) setCell(r, c, true);
+          updateCount();
+        }, getSpeed() * 0.75);
+      },
+
+      'matrix-rain': () => {
+        const drops = Array.from({ length: gridSize }, () => Math.floor(Math.random() * gridSize * -0.5));
+        animTimer = setInterval(() => {
+          setAll(false);
+          for (let c = 0; c < gridSize; c++) {
+            for (let t = 0; t < 5; t++) {
+              const r = drops[c] - t;
+              if (r >= 0 && r < gridSize) setCell(r, c, true);
+            }
+            drops[c]++;
+            if (drops[c] > gridSize + 5) drops[c] = Math.floor(Math.random() * -4);
+          }
+          updateCount();
+        }, getSpeed() * 0.65);
+      },
+
+      'radar': () => {
+        let angle = 0;
+        const center = (gridSize - 1) / 2;
+        animTimer = setInterval(() => {
+          setAll(false);
+          setCellSafe(Math.round(center), Math.round(center), true);
+          for (let d = 1; d < gridSize * 1.1; d++) {
+            for (let t = 0; t < 6; t++) {
+              const a = angle - t * 0.12;
+              setCellSafe(
+                Math.round(center + d * Math.sin(a)),
+                Math.round(center + d * Math.cos(a)),
+                true
+              );
+            }
+          }
+          angle += 0.18;
+          updateCount();
+        }, getSpeed() * 0.65);
+      },
+
+      'border': () => {
+        const perimeter = getBorderPath();
+        let i = 0;
+        const trail = Math.max(4, Math.floor(gridSize * 0.8));
+        animTimer = setInterval(() => {
+          setAll(false);
+          for (let t = 0; t < trail; t++) {
+            const p = perimeter[(i - t + perimeter.length) % perimeter.length];
+            setCell(p[0], p[1], true);
+          }
+          i = (i + 1) % perimeter.length;
+          updateCount();
+        }, getSpeed() * 0.7);
+      },
+
+      'diamond': () => {
+        let size = 0;
+        let growing = true;
+        const mid = (gridSize - 1) / 2;
+        animTimer = setInterval(() => {
+          setAll(false);
+          for (let r = 0; r < gridSize; r++)
+            for (let c = 0; c < gridSize; c++)
+              if (Math.abs(r - mid) + Math.abs(c - mid) === Math.round(size)) setCell(r, c, true);
+          if (growing) {
+            size += 0.5;
+            if (size > gridSize) growing = false;
+          } else {
+            size -= 0.5;
+            if (size < 0) growing = true;
+          }
+          updateCount();
+        }, getSpeed() * 0.8);
+      },
+
+      'equalizer': () => {
+        const heights = Array.from({ length: gridSize }, () => Math.floor(gridSize / 2));
+        const targets = [...heights];
+        animTimer = setInterval(() => {
+          for (let c = 0; c < gridSize; c++) {
+            if (Math.random() < 0.18) targets[c] = Math.floor(Math.random() * gridSize);
+            heights[c] += Math.sign(targets[c] - heights[c]);
+          }
+          setAll(false);
+          for (let c = 0; c < gridSize; c++)
+            for (let r = gridSize - heights[c]; r < gridSize; r++)
+              setCell(r, c, true);
+          updateCount();
+        }, getSpeed() * 0.55);
+      },
+
+      'ripple': () => {
+        let radius = 0;
+        let originR = Math.floor(gridSize / 2);
+        let originC = Math.floor(gridSize / 2);
+        animTimer = setInterval(() => {
+          setAll(false);
+          for (let r = 0; r < gridSize; r++)
+            for (let c = 0; c < gridSize; c++) {
+              const d = Math.hypot(r - originR, c - originC);
+              if (Math.abs(d - radius) < 0.55) setCell(r, c, true);
+            }
+          radius += 0.55;
+          if (radius > gridSize * 1.3) {
+            radius = 0;
+            originR = Math.floor(Math.random() * gridSize);
+            originC = Math.floor(Math.random() * gridSize);
+          }
+          updateCount();
+        }, getSpeed() * 0.7);
+      },
+
+      'life': () => {
+        setAll(false);
+        for (let i = 0; i < gridSize * gridSize * 0.32; i++)
+          setCell(Math.floor(Math.random() * gridSize), Math.floor(Math.random() * gridSize), true);
+        animTimer = setInterval(() => {
+          const next = Array.from({ length: gridSize }, () => Array(gridSize).fill(false));
+          for (let r = 0; r < gridSize; r++) {
+            for (let c = 0; c < gridSize; c++) {
+              let n = 0;
+              for (let dr = -1; dr <= 1; dr++)
+                for (let dc = -1; dc <= 1; dc++) {
+                  if (!dr && !dc) continue;
+                  const nr = r + dr, nc = c + dc;
+                  if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize && cells[idx(nr, nc)].classList.contains('on')) n++;
+                }
+              const alive = cells[idx(r, c)].classList.contains('on');
+              next[r][c] = n === 3 || (alive && (n === 2 || n === 3));
+            }
+          }
+          setAll(false);
+          for (let r = 0; r < gridSize; r++)
+            for (let c = 0; c < gridSize; c++)
+              if (next[r][c]) setCell(r, c, true);
+          updateCount();
+        }, getSpeed() * 1.8);
+      },
+
+      'explosion': () => {
+        let radius = 0;
+        const center = (gridSize - 1) / 2;
+        animTimer = setInterval(() => {
+          setAll(false);
+          for (let r = 0; r < gridSize; r++)
+            for (let c = 0; c < gridSize; c++) {
+              const d = Math.hypot(r - center, c - center);
+              if (d >= radius - 0.7 && d <= radius + 0.4) setCell(r, c, true);
+            }
+          radius += 0.65;
+          if (radius > gridSize * 1.1) radius = 0;
+          updateCount();
+        }, getSpeed() * 0.5);
+      },
+
+      'plasma': () => {
+        let t = 0;
+        animTimer = setInterval(() => {
+          setAll(false);
+          for (let r = 0; r < gridSize; r++)
+            for (let c = 0; c < gridSize; c++) {
+              const v = Math.sin(r * 0.55 + t) + Math.sin(c * 0.45 + t * 1.3) + Math.sin((r + c) * 0.35 + t * 0.7);
+              if (v > 0.85) setCell(r, c, true);
+            }
+          t += 0.28;
+          updateCount();
+        }, getSpeed() * 0.45);
+      },
+
+      'heartbeat': () => {
+        let beat = 0;
+        const center = (gridSize - 1) / 2;
+        animTimer = setInterval(() => {
+          setAll(false);
+          const phase = beat % 14;
+          let scale = 2.1;
+          if (phase < 2) scale = 1.85;
+          else if (phase === 2) scale = 2.45;
+          else if (phase === 3) scale = 2.15;
+          drawHeart(scale, center, center);
+          beat++;
+          updateCount();
+        }, getSpeed() * 0.7);
+      },
+
+      'clock': () => {
+        let tick = 0;
+        const center = (gridSize - 1) / 2;
+        animTimer = setInterval(() => {
+          setAll(false);
+          setCellSafe(Math.round(center), Math.round(center), true);
+          const secA = (tick / 8) * Math.PI * 2 - Math.PI / 2;
+          const minA = (tick / 48) * Math.PI * 2 - Math.PI / 2;
+          drawHand(center, secA, gridSize * 0.42);
+          drawHand(center, minA, gridSize * 0.3);
+          for (let i = 0; i < 12; i++) {
+            const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+            setCellSafe(
+              Math.round(center + (gridSize * 0.38) * Math.sin(a)),
+              Math.round(center + (gridSize * 0.38) * Math.cos(a)),
+              true
+            );
+          }
+          tick++;
+          updateCount();
+        }, getSpeed() * 1.5);
+      },
+
+      'sos': () => {
+        const units = [1,0,1,0,1,0, 0,0, 1,1,1,0,1,1,1,0,1,1,1,0, 0,0, 1,0,1,0,1,0];
+        let i = 0;
+        animTimer = setInterval(() => {
+          setAll(false);
+          if (units[i % units.length]) {
+            const band = Math.max(1, Math.floor(gridSize / 5));
+            for (let b = 0; b < band; b++) {
+              const row = Math.floor(gridSize / 2) - Math.floor(band / 2) + b;
+              if (row >= 0 && row < gridSize)
+                for (let c = 0; c < gridSize; c++) setCell(row, c, true);
+            }
+          }
+          i++;
+          updateCount();
+        }, getSpeed() * 0.35);
+      },
+
+      'knight': () => {
+        const moves = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+        let kr = Math.floor(gridSize / 2), kc = Math.floor(gridSize / 2);
+        const trail = [[kr, kc]];
+        animTimer = setInterval(() => {
+          const options = moves
+            .map(([dr, dc]) => [kr + dr, kc + dc])
+            .filter(([r, c]) => r >= 0 && r < gridSize && c >= 0 && c < gridSize);
+          if (options.length) {
+            [kr, kc] = options[Math.floor(Math.random() * options.length)];
+            trail.push([kr, kc]);
+            if (trail.length > Math.max(6, Math.floor(gridSize * 0.9))) trail.shift();
+          }
+          setAll(false);
+          trail.forEach(([r, c]) => setCell(r, c, true));
+          updateCount();
+        }, getSpeed() * 0.85);
+      },
+
+      'diagonal': () => {
+        let offset = 0;
+        animTimer = setInterval(() => {
+          setAll(false);
+          for (let r = 0; r < gridSize; r++)
+            for (let c = 0; c < gridSize; c++)
+              if ((r + c) % gridSize === offset % gridSize) setCell(r, c, true);
+          offset = (offset + 1) % gridSize;
+          updateCount();
+        }, getSpeed() * 0.9);
+      },
+
+      'fill': () => {
+        let step = 0;
+        const total = gridSize * gridSize;
+        animTimer = setInterval(() => {
+          setAll(false);
+          for (let i = 0; i <= step && i < total; i++) {
+            const r = Math.floor(i / gridSize);
+            const c = i % gridSize;
+            setCell(r, c, true);
+          }
+          step = (step + 1) % (total + 8);
+          updateCount();
+        }, getSpeed() * 0.4);
+      }
+    };
+
+    speedSlider.addEventListener('input', () => {
+      speedVal.textContent = speedSlider.value + ' ms';
+      if (currentAnim) {
+        const fn = animations[currentAnim];
+        if (fn) startAnim(currentAnim, fn);
+      }
+    });
+
+    document.getElementById('animButtons').addEventListener('click', e => {
+      const btn = e.target.closest('[data-anim]');
+      if (!btn) return;
+      const fn = animations[btn.dataset.anim];
+      if (fn) startAnim(btn.dataset.anim, fn);
+    });
+
+    document.getElementById('stopBtn').addEventListener('click', stopAnimation);
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      stopAnimation();
+      setAll(false);
+    });
+
+    buildGrid();
+  </script>
+</body>
+</html>
